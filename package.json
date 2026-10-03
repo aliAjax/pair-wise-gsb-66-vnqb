@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite --port 18466",
     "build": "vue-tsc --noEmit -p tsconfig.app.json && vite build",
-    "preview": "vite preview --port 18466"
+    "preview": "vite preview --port 18466",
+    "verify:sync": "esbuild scripts/verify-sync.mts --bundle --platform=node --format=esm --outfile=node_modules/.cache/verify-sync.mjs --log-level=warning && node node_modules/.cache/verify-sync.mjs",
+    "verify:store": "esbuild scripts/verify-store.mts --bundle --platform=node --format=esm --outfile=node_modules/.cache/verify-store.mjs --log-level=warning && node node_modules/.cache/verify-store.mjs"
   },
   "dependencies": {
     "@apollo/client": "^3.12.4",

@@ -23,12 +23,17 @@ const headers = [
   { title: '状态', key: 'status' },
   { title: '责任工区', key: 'owner' },
   { title: '版本', key: 'version' },
+  { title: '回传', key: 'sync' },
   { title: '', key: 'actions' }
 ]
-const statuses: Array<DefectStatus | '全部'> = ['全部', '待派工', '整治中', '待复测', '复测不合格', '已关闭']
+const statuses: Array<DefectStatus | '全部'> = ['全部', '待派工', '整治中', '待复测', '复测不合格', '待复核', '已关闭']
 function assign() {
   store.assign(selected.value, owner.value)
   selected.value = []
+}
+function pendingBadge(id: string) {
+  const count = store.pendingOf(id).length
+  return count ? `${count}待传` : ''
 }
 </script>
 
@@ -50,9 +55,10 @@ function assign() {
     <v-data-table v-model="selected" :headers="headers" :items="store.filtered" item-value="id" show-select density="compact" :items-per-page="12">
       <template #item.value="{ item }">{{ item.measuredValue }} / {{ item.limit }}</template>
       <template #item.severity="{ item }"><v-chip size="small" :color="item.severity === '一级' ? 'error' : item.severity === '二级' ? 'warning' : 'default'">{{ item.severity }}</v-chip></template>
-      <template #item.status="{ item }"><v-chip size="small" :color="item.status === '已关闭' ? 'success' : item.status === '复测不合格' ? 'error' : 'warning'">{{ item.status }}</v-chip></template>
+      <template #item.status="{ item }"><v-chip size="small" :color="item.status === '待复核' ? 'error' : item.status === '已关闭' ? 'success' : item.status === '复测不合格' ? 'error' : 'warning'">{{ item.status }}</v-chip></template>
       <template #item.mileage="{ item }">K{{ Math.floor(item.mileage / 1000) }}+{{ String(item.mileage % 1000).padStart(3, '0') }}</template>
       <template #item.version="{ item }">V{{ item.version }}</template>
+      <template #item.sync="{ item }"><em v-if="pendingBadge(item.id)" class="sync-badge" :class="{ conflict: !!item.conflict }">{{ item.conflict ? '冲突待复核' : pendingBadge(item.id) }}</em><span v-else class="sync-ok">已入库</span></template>
       <template #item.actions="{ item }"><v-btn size="small" variant="text" @click="router.push(`/work-orders/${item.id}`)">处置</v-btn></template>
     </v-data-table>
   </section>
@@ -60,4 +66,7 @@ function assign() {
 
 <style scoped>
 .query-band { display: flex; justify-content: space-between; font-size: 11px; color: #718080; margin: 0 0 10px; }
+.sync-badge { font-style: normal; font-size: 10px; padding: 2px 8px; border-radius: 9px; background: #f3e3bd; color: #7d6126; }
+.sync-badge.conflict { background: #fbe0de; color: #a33a35; }
+.sync-ok { font-size: 10px; color: #4e7d63; }
 </style>
