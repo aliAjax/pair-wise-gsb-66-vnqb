@@ -1,4 +1,4 @@
-import type { AuditEntry, Defect, GeometryMeasurement, TrackSegment } from '../types'
+import type { AuditEntry, Defect, GeometryMeasurement, OfflineOperation, SpeedRecalcRecord, TrackSegment } from '../types'
 
 const measurements = (start: number, values: number[]): GeometryMeasurement[] => values.map((value, index) => ({
   id: `GM-${start + index * 200}`,
@@ -37,4 +37,25 @@ export const seedAudit: AuditEntry[] = [
   { id: 'A-1', entityId: 'SEG-K102', action: '导入检测数据', operator: 'GJ-6轨检车', detail: '导入K102+000至K104+800共14个采样点', createdAt: '2026-09-29T02:00:00' },
   { id: 'A-2', entityId: 'GD-260929-01', action: '批量派工', operator: '调度员 方林', detail: '超限点分配至工务一工区，要求24小时内整治', createdAt: '2026-09-29T04:15:00' },
   { id: 'A-3', entityId: 'GD-260929-02', action: '提交复测', operator: '王磊', detail: '第1轮复测未通过，重新进入整治', createdAt: '2026-09-29T11:30:00' }
+]
+
+// 无网区段现场暂存、尚未回传的操作。GD-260929-02 在断网期间已被一工区推进到 V4，
+// 二工区基于 V3 的离线记录回传时会因缺陷版本不一致转为待复核，而不是直接覆盖。
+export const seedOfflineQueue: OfflineOperation[] = [
+  {
+    id: 'OP-260930-01', kind: '复测', segmentId: 'SEG-K102', defectId: 'GD-260929-01', crew: '工务一工区', operator: '李海',
+    summary: '复测轨距 1444 / 限值 1446，第1轮通过', baseDefectVersion: 3, baseSegmentVersion: 4,
+    retest: { round: 1, passed: true, measuredValue: 1444, limit: 1446, note: '无网区段现场复测达标，回驻地补录', tester: '李海', testedAt: '2026-09-30T10:20:00' },
+    status: '待回传', attempts: 0, createdAt: '2026-09-30T10:21:00'
+  },
+  {
+    id: 'OP-260930-02', kind: '整治记录', segmentId: 'SEG-K102', defectId: 'GD-260929-02', crew: '工务二工区', operator: '陈伟',
+    summary: '捣固：岔区高低综合整治', baseDefectVersion: 3, baseSegmentVersion: 4,
+    action: { method: '捣固', note: '岔区高低综合整治，现场无网暂存', operator: '陈伟', recordedAt: '2026-09-30T08:05:00' },
+    status: '待回传', attempts: 0, createdAt: '2026-09-30T08:06:00'
+  }
+]
+
+export const seedRecalcLog: SpeedRecalcRecord[] = [
+  { id: 'SR-1', segmentId: 'SEG-K102', openLevelOne: 1, previousTemporary: undefined, nextTemporary: 120, reason: '一级缺陷GD-260929-01未关闭，设置临时限速120 km/h（正式限速160 km/h）', createdAt: '2026-09-29T04:20:00' }
 ]

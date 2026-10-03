@@ -66,3 +66,51 @@ export interface AuditEntry {
   detail: string
   createdAt: string
 }
+
+export type OfflineOpKind = '整治记录' | '复测' | '关闭缺陷' | '区段限速'
+export type OfflineOpStatus = '待回传' | '已回传' | '冲突待复核' | '回传失败' | '已作废'
+
+export interface OfflineOperation {
+  id: string
+  kind: OfflineOpKind
+  segmentId: string
+  defectId?: string
+  crew: string
+  operator: string
+  summary: string
+  baseDefectVersion?: number
+  baseSegmentVersion: number
+  action?: RectificationAction
+  retest?: RetestResult
+  speedLimit?: number
+  temporarySpeedLimit?: number
+  status: OfflineOpStatus
+  attempts: number
+  lastError?: string
+  createdAt: string
+  syncedAt?: string
+}
+
+export interface SyncConflict {
+  id: string
+  opId: string
+  segmentId: string
+  defectId?: string
+  reason: string
+  queuedSummary: string
+  currentSummary: string
+  status: '待复核' | '已复核'
+  resolution?: '采用回传记录' | '保留现有记录'
+  createdAt: string
+  resolvedAt?: string
+}
+
+export interface SpeedRecalcRecord {
+  id: string
+  segmentId: string
+  openLevelOne: number
+  previousTemporary?: number
+  nextTemporary?: number
+  reason: string
+  createdAt: string
+}

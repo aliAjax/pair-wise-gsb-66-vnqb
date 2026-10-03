@@ -38,7 +38,7 @@ function assign() {
       <article><span>超限缺陷</span><strong>{{ store.defects.length }}</strong><small>含已关闭项</small></article>
       <article><span>一级缺陷</span><strong>{{ store.defects.filter((item) => item.severity === '一级' && item.status !== '已关闭').length }}</strong><small>需限速联查</small></article>
       <article><span>待复测</span><strong>{{ store.defects.filter((item) => item.status === '待复测' || item.status === '复测不合格').length }}</strong><small>至少完成一轮复测</small></article>
-      <article><span>区段版本</span><strong>{{ store.segments.reduce((sum, item) => sum + item.version, 0) }}</strong><small>每次整治递增</small></article>
+      <article><span>待回传 / 待复核</span><strong>{{ store.pendingOps.length }} / {{ store.openConflicts.length }}</strong><small>断网暂存本机，恢复后按版本合并</small></article>
     </div>
     <div class="toolbar">
       <v-text-field v-model="store.keyword" density="compact" variant="outlined" hide-details prepend-inner-icon="mdi-magnify" placeholder="搜索缺陷、区段、类型或工区" />
@@ -46,11 +46,11 @@ function assign() {
       <v-select v-model="owner" :items="['工务一工区', '工务二工区', '桥隧工区']" density="compact" variant="outlined" hide-details />
       <v-btn color="primary" :disabled="!selected.length" @click="assign">批量派工 {{ selected.length ? `(${selected.length})` : '' }}</v-btn>
     </div>
-    <div class="query-band"><span>{{ loading ? 'GraphQL数据读取中' : `GraphQL已返回${segmentResult?.segments?.length ?? 0}个区段` }}</span><span>离线补录会保留记录轮次</span></div>
+    <div class="query-band"><span>{{ loading ? 'GraphQL数据读取中' : `GraphQL已返回${segmentResult?.segments?.length ?? 0}个区段` }}</span><span>{{ store.online ? '在线：提交即入库' : '离线：补录暂存本机' }}，回传保留原始记录时间和复测轮次</span></div>
     <v-data-table v-model="selected" :headers="headers" :items="store.filtered" item-value="id" show-select density="compact" :items-per-page="12">
       <template #item.value="{ item }">{{ item.measuredValue }} / {{ item.limit }}</template>
       <template #item.severity="{ item }"><v-chip size="small" :color="item.severity === '一级' ? 'error' : item.severity === '二级' ? 'warning' : 'default'">{{ item.severity }}</v-chip></template>
-      <template #item.status="{ item }"><v-chip size="small" :color="item.status === '已关闭' ? 'success' : item.status === '复测不合格' ? 'error' : 'warning'">{{ item.status }}</v-chip></template>
+      <template #item.status="{ item }"><v-chip size="small" :color="item.status === '已关闭' ? 'success' : item.status === '复测不合格' ? 'error' : 'warning'">{{ item.status }}</v-chip><v-chip v-if="store.pendingDefectIds.has(item.id)" size="x-small" color="secondary" class="pending-chip">有暂存</v-chip></template>
       <template #item.mileage="{ item }">K{{ Math.floor(item.mileage / 1000) }}+{{ String(item.mileage % 1000).padStart(3, '0') }}</template>
       <template #item.version="{ item }">V{{ item.version }}</template>
       <template #item.actions="{ item }"><v-btn size="small" variant="text" @click="router.push(`/work-orders/${item.id}`)">处置</v-btn></template>
@@ -60,4 +60,5 @@ function assign() {
 
 <style scoped>
 .query-band { display: flex; justify-content: space-between; font-size: 11px; color: #718080; margin: 0 0 10px; }
+.pending-chip { margin-left: 6px; }
 </style>

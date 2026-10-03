@@ -7,20 +7,22 @@ const route = useRoute()
 const store = useTrackStore()
 const selectedId = ref(String(route.params.id || store.defects[0]?.id || ''))
 const defect = computed(() => store.defects.find((item) => item.id === selectedId.value))
+const queuedOps = computed(() => store.offlineQueue.filter((item) => item.defectId === selectedId.value && (item.status === '待回传' || item.status === '回传失败' || item.status === '冲突待复核')))
 const action = reactive({ method: '捣固', note: '', operator: '李海' })
 const retest = reactive({ measuredValue: 0, tester: '王磊', note: '' })
 const message = ref('')
 function addAction() {
   if (!defect.value || !action.note) return
-  store.addAction(defect.value.id, { ...action, method: action.method as any, recordedAt: new Date().toISOString() })
+  const result = store.addAction(defect.value.id, { ...action, method: action.method as any, recordedAt: new Date().toISOString() }, defect.value.owner)
+  message.value = result.message
   action.note = ''
 }
 function addRetest() {
   if (!defect.value) return
   const round = defect.value.retests.length + 1
   const passed = retest.measuredValue <= defect.value.limit
-  store.addRetest(defect.value.id, { round, passed, measuredValue: retest.measuredValue, limit: defect.value.limit, note: retest.note || (passed ? '复测合格' : '仍超过限值'), tester: retest.tester, testedAt: new Date().toISOString() })
-  message.value = passed ? '复测通过，缺陷已关闭' : '复测不合格，任务重新进入整治'
+  const result = store.addRetest(defect.value.id, { round, passed, measuredValue: retest.measuredValue, limit: defect.value.limit, note: retest.note || (passed ? '复测合格' : '仍超过限值'), tester: retest.tester, testedAt: new Date().toISOString() }, defect.value.owner)
+  message.value = result.message
 }
 function closeDefect() {
   if (!defect.value) return
@@ -34,12 +36,16 @@ function closeDefect() {
     <div class="work-layout">
       <div class="work-list">
         <button v-for="item in store.defects" :key="item.id" :class="{ active: item.id === selectedId }" @click="selectedId = item.id">
-          <span>{{ item.id }} · V{{ item.version }}</span><strong>{{ item.type }}超限</strong><small>{{ item.owner }} · {{ item.status }}</small>
+          <span>{{ item.id }} · V{{ item.version }}<em v-if="store.pendingDefectIds.has(item.id)">有待回传</em></span><strong>{{ item.type }}超限</strong><small>{{ item.owner }} · {{ item.status }}</small>
         </button>
       </div>
       <div v-if="defect" class="work-main">
         <div class="section-head"><div><span>{{ defect.segmentId }} · K{{ Math.floor(defect.mileage / 1000) }}+{{ String(defect.mileage % 1000).padStart(3, '0') }}</span><h2>{{ defect.type }}缺陷整治</h2><p>{{ defect.measuredValue }} / 限值 {{ defect.limit }} · {{ defect.severity }} · {{ defect.status }}</p></div><v-chip :color="defect.status === '已关闭' ? 'success' : 'warning'">{{ defect.status }}</v-chip></div>
-        <div class="offline-band"><strong>离线补录模式</strong><span>现场无网络时先写入本地队列，恢复后保留原始记录时间和复测轮次。</span></div>
+        <div class="offline-band" :class="{ offline: !store.online }"><strong>{{ store.online ? '在线模式' : '离线补录模式' }}</strong><span>{{ store.online ? '提交即入库；断网时自动转为本地暂存。' : '现场无网络，整治、复测和关闭操作先写入本机队列，恢复后按缺陷版本合并，保留原始记录时间和复测轮次。' }}</span></div>
+        <div v-if="queuedOps.length" class="queued-band">
+          <strong>本机暂存 {{ queuedOps.length }} 条</strong>
+          <span v-for="item in queuedOps" :key="item.id">{{ item.kind }}｜{{ item.summary }}（基于V{{ item.baseDefectVersion }}，{{ item.status }}）</span>
+        </div>
         <div class="action-form">
           <v-select v-model="action.method" :items="['打磨', '捣固', '更换', '垫板调整', '测量复核']" label="整治方式" density="compact" variant="outlined" hide-details />
           <v-text-field v-model="action.note" label="现场记录" density="compact" variant="outlined" hide-details />
@@ -69,9 +75,12 @@ function closeDefect() {
 .work-list button { border: 1px solid #dae1e2; background: white; padding: 13px; text-align: left; display: grid; gap: 6px; cursor: pointer; }
 .work-list button.active { border-color: #315b72; box-shadow: inset 3px 0 #315b72; }
 .work-list span, .work-list small { color: #738180; font-size: 11px; }
+.work-list em { font-style: normal; color: #b08735; margin-left: 6px; }
 .work-main { background: white; border: 1px solid #dae1e2; padding: 18px; }
 .section-head { display: flex; justify-content: space-between; margin-bottom: 14px; }.section-head span { color: #71807e; font-size: 11px; }.section-head h2 { margin: 4px 0; }.section-head p { margin: 0; color: #667573; }
-.offline-band { display: flex; justify-content: space-between; padding: 11px; border-left: 3px solid #b08735; background: #fbf6e9; font-size: 12px; }.offline-band span { color: #736d5b; }
+.offline-band { display: flex; justify-content: space-between; gap: 12px; padding: 11px; border-left: 3px solid #43876b; background: #eef5f1; font-size: 12px; }.offline-band span { color: #5f6f6a; }
+.offline-band.offline { border-left-color: #b08735; background: #fbf6e9; }.offline-band.offline span { color: #736d5b; }
+.queued-band { display: grid; gap: 4px; margin-top: 10px; padding: 10px 11px; border: 1px dashed #c9b37e; background: #fdfaf2; font-size: 11px; color: #736d5b; }.queued-band strong { color: #8c6a2f; font-size: 12px; }
 .action-form { display: grid; grid-template-columns: 170px 1fr 140px auto; gap: 10px; margin: 13px 0; }
 .validation-message { color: #a63e38; font-size: 12px; margin-bottom: 10px; }
 .two-column { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }.two-column h3 { font-size: 14px; }
